@@ -1,2 +1,2 @@
 # 5DoF_Kinematics
- Forward and inverse kinematics for 5-DoF robotic manipulator.
+A lightweight Python 3 desktop tool for testing a 5-DoF manipulator (plus gripper) from PC.
