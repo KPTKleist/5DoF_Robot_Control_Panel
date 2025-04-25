@@ -3,7 +3,7 @@ import numpy as np
 import tkinter as tk
 import customtkinter as ctk
 import serial
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from typing import Optional
 import roboticstoolbox as rtb
 
