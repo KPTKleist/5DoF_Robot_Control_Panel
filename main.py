@@ -15,11 +15,11 @@ HOLD_MS = 100 # repeat interval while button is held (ms)
 
 # Robot model
 def build_robot_5dof():
-    L1 = rtb.RevoluteDH(d=1.0, a=0.0, alpha=np.pi/2)
-    L2 = rtb.RevoluteDH(d=0.0, a=3.0, alpha=0.0, offset=np.pi/2)
-    L3 = rtb.RevoluteDH(d=0.0, a=2.0, alpha=0.0)
-    L4 = rtb.RevoluteDH(d=-0.5, a=0.0, alpha=-np.pi/2, offset=-np.pi/2)
-    L5 = rtb.RevoluteDH(d=1.0, a=0.0, alpha=0.0)
+    L1 = rtb.RevoluteDH(d=0.96, a=0.0, alpha=np.pi/2)
+    L2 = rtb.RevoluteDH(d=0.0, a=1.05, alpha=0.0, offset=np.pi/2)
+    L3 = rtb.RevoluteDH(d=0.0, a=1.27, alpha=0.0)
+    L4 = rtb.RevoluteDH(d=-0.13, a=0.0, alpha=-np.pi/2, offset=-np.pi/2)
+    L5 = rtb.RevoluteDH(d=1.7, a=0.0, alpha=0.0)
 
     return rtb.DHRobot([L1, L2, L3, L4, L5], name='5dof')
 
@@ -66,13 +66,14 @@ class App(ctk.CTk):
         self.hold_active = False  # True while < or > is held
         self.hold_job: Optional[str] = None
         self.hold_params: tuple[int, int] = (0, 0)
+        self.auto_job: Optional[str] = None
 
         # plot the robot once
         self.backend = robot.plot(
             np.radians(self.curr_q_deg),
             backend="pyplot",
             block=False,
-            limits=[-5, 5, -5, 5, -1, 9]
+            limits=[-5, 5, -5, 5, -1, 6]
         )
 
         # build joint rows (labels, entries, Set buttons, current labels)
@@ -82,7 +83,7 @@ class App(ctk.CTk):
         for i in range(5):  # q1-q5
             row = i
             ctk.CTkLabel(self, text=f"q{i + 1} (°)").grid(
-                row=row, column=0, padx=6, pady=4, sticky="e"
+                row=row, column=0, padx=18, pady=4, sticky="e"
             )
 
             ent = ctk.CTkEntry(self, width=70)
@@ -105,8 +106,8 @@ class App(ctk.CTk):
                 command=lambda j=i: self.set_joint(j)
             ).grid(row=row, column=4, padx=2, pady=3)
 
-            lbl = ctk.CTkLabel(self, text=f"{START_Q_DEG[i]:.2f}", width=60, anchor="w")
-            lbl.grid(row=row, column=5, padx=6, pady=3, sticky="w")
+            lbl = ctk.CTkLabel(self, text=f"{START_Q_DEG[i]:.2f}", width=50, anchor="w")
+            lbl.grid(row=row, column=5, padx=18, pady=3, sticky="w")
             self.curr_labels.append(lbl)
 
         # gripper switch (row 5)
@@ -134,12 +135,9 @@ class App(ctk.CTk):
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         btn_frame.grid(row=7, column=0, columnspan=6, pady=(0, 12))
 
-        ctk.CTkButton(btn_frame, text="Send to Serial",
-                      command=self.send_serial).pack(side="left", padx=6)
+        ctk.CTkButton(btn_frame, text="Send to Serial", command=self.send_serial).pack(side="left", padx=6)
 
-        self.auto_switch = ctk.CTkSwitch(
-            btn_frame, text="Auto-send", command=self.toggle_auto_send
-        )
+        self.auto_switch = ctk.CTkSwitch(btn_frame, text="Auto-send", command=self.toggle_auto_send)
         self.auto_switch.pack(side="left", padx=6)
 
     # GUI helpers
