@@ -8,8 +8,10 @@ from typing import Optional
 import roboticstoolbox as rtb
 
 # Constants
-START_Q_DEG = [0, 0, 0, 0, 0]   # q1-q5 at launch (degrees)
-START_GRIP  = 0                 # 0 ° closed, 90 ° open
+START_Q_DEG = [0, 0, 0, 0, 0] # q1-q5 at launch (degrees)
+START_GRIP = 0 # 0 ° closed, 90 ° open
+INCR_STEP = 1.0 # ° added / subtracted per tick
+HOLD_MS = 100 # repeat interval while button is held (ms)
 
 # Robot model
 def build_robot_5dof():
@@ -61,7 +63,9 @@ class App(ctk.CTk):
 
         # state
         self.curr_q_deg: list[float] = START_Q_DEG.copy()  # live joint vector
-        self.auto_job = None  # after() handle
+        self.hold_active = False  # True while < or > is held
+        self.hold_job: Optional[str] = None
+        self.hold_params: tuple[int, int] = (0, 0)
 
         # plot the robot once
         self.backend = robot.plot(
@@ -81,19 +85,28 @@ class App(ctk.CTk):
                 row=row, column=0, padx=6, pady=4, sticky="e"
             )
 
-            ent = ctk.CTkEntry(self, width=80)
+            ent = ctk.CTkEntry(self, width=70)
             ent.insert(0, str(START_Q_DEG[i]))
-            ent.grid(row=row, column=1, padx=2, pady=4)
+            ent.grid(row=row, column=1, padx=2, pady=3)
             self.entries.append(ent)
 
-            ctk.CTkButton(
-                self, text="Set", width=40,
-                command=lambda j=i: self.set_joint(j)
-            ).grid(row=row, column=2, padx=2, pady=4)
+            btn_lt = ctk.CTkButton(self, text="<", width=26)
+            btn_lt.grid(row=row, column=2, padx=2, pady=3)
+            btn_lt.bind("<ButtonPress-1>", lambda e, j=i: self._hold_start(j, -1))
+            btn_lt.bind("<ButtonRelease-1>", lambda e: self._hold_stop())
 
-            lbl = ctk.CTkLabel(self, text=f"{START_Q_DEG[i]:.2f}",
-                               width=60, anchor="w")
-            lbl.grid(row=row, column=3, padx=6, pady=4, sticky="w")
+            btn_rt = ctk.CTkButton(self, text=">", width=26)
+            btn_rt.grid(row=row, column=3, padx=2, pady=3)
+            btn_rt.bind("<ButtonPress-1>", lambda e, j=i: self._hold_start(j, +1))
+            btn_rt.bind("<ButtonRelease-1>", lambda e: self._hold_stop())
+
+            ctk.CTkButton(
+                self, text="Set", width=38,
+                command=lambda j=i: self.set_joint(j)
+            ).grid(row=row, column=4, padx=2, pady=3)
+
+            lbl = ctk.CTkLabel(self, text=f"{START_Q_DEG[i]:.2f}", width=60, anchor="w")
+            lbl.grid(row=row, column=5, padx=6, pady=3, sticky="w")
             self.curr_labels.append(lbl)
 
         # gripper switch (row 5)
@@ -106,7 +119,7 @@ class App(ctk.CTk):
 
         # serial-port frame (row 6)
         port_frame = ctk.CTkFrame(self)
-        port_frame.grid(row=6, column=0, columnspan=4, sticky="we", pady=(0, 8))
+        port_frame.grid(row=6, column=0, columnspan=6, sticky="we", pady=(0, 8))
         ctk.CTkLabel(port_frame, text="Serial port").pack(side="left", padx=(6, 2))
         self.port_entry = ctk.CTkEntry(port_frame, width=90)
         default_port = "COM3" if sys.platform.startswith("win") else "/dev/ttyUSB0"
@@ -119,7 +132,7 @@ class App(ctk.CTk):
 
         # action buttons frame (row 7)
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
-        btn_frame.grid(row=7, column=0, columnspan=4, pady=(0, 12))
+        btn_frame.grid(row=7, column=0, columnspan=6, pady=(0, 12))
 
         ctk.CTkButton(btn_frame, text="Send to Serial",
                       command=self.send_serial).pack(side="left", padx=6)
@@ -204,6 +217,37 @@ class App(ctk.CTk):
 
         serial_link.send(self._packet())
         self.auto_job = self.after(200, self._auto_loop)
+
+    # increment & hold helpers
+    def _increment_joint(self, idx: int, delta_sign: int):
+        """Apply ±INCR_STEP to joint *idx* and refresh GUI + plot."""
+        self.curr_q_deg[idx] += delta_sign * INCR_STEP
+        val = self.curr_q_deg[idx]
+        self.entries[idx].delete(0, tk.END)
+        self.entries[idx].insert(0, f"{val:.2f}")
+        self.curr_labels[idx].configure(text=f"{val:.2f}")
+        robot.q = np.radians(self.curr_q_deg)
+        self.backend.step(0.05)
+
+    def _hold_start(self, idx: int, delta_sign: int):
+        self.hold_active = True  # ← NEW
+        self._increment_joint(idx, delta_sign)
+        self.hold_params = (idx, delta_sign)
+        self.hold_job = self.after(HOLD_MS, self._hold_repeat)
+
+    def _hold_repeat(self):
+        if not self.hold_active:  # ← NEW: stop loop
+            self.hold_job = None
+            return
+        idx, delta_sign = self.hold_params
+        self._increment_joint(idx, delta_sign)
+        self.hold_job = self.after(HOLD_MS, self._hold_repeat)
+
+    def _hold_stop(self):
+        self.hold_active = False  # ← NEW
+        if self.hold_job:
+            self.after_cancel(self.hold_job)
+            self.hold_job = None
 
 if __name__ == "__main__":
     app = App()
