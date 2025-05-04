@@ -8,10 +8,10 @@ from typing import Optional
 import roboticstoolbox as rtb
 
 # Constants
-START_Q_DEG = [0, 0, 0, 0, 0] # q1-q5 at launch (degrees)
-START_GRIP = 0 # 0 ° closed, 90 ° open
+START_Q_DEG = [0, 45, -90, -90, 0] # q1-q5 at launch (degrees)
+START_GRIP = -20 # -20° open, 44° closed
 INCR_STEP = 1.0 # ° added / subtracted per tick
-HOLD_MS = 100 # repeat interval while button is held (ms)
+HOLD_MS = 50 # repeat interval while button is held (ms)
 
 # Robot model
 def build_robot_5dof():
@@ -112,9 +112,9 @@ class App(ctk.CTk):
 
         # gripper switch (row 5)
         self.grip_switch = ctk.CTkSwitch(
-            self, text="Gripper open", onvalue=90, offvalue=0
+            self, text="Gripper close", onvalue=44, offvalue=-20
         )
-        if START_GRIP == 90:
+        if START_GRIP == 44:
             self.grip_switch.select()
         self.grip_switch.grid(row=5, column=0, columnspan=3, pady=(4, 12))
 
@@ -214,7 +214,7 @@ class App(ctk.CTk):
             return
 
         serial_link.send(self._packet())
-        self.auto_job = self.after(200, self._auto_loop)
+        self.auto_job = self.after(1200, self._auto_loop)
 
     # increment & hold helpers
     def _increment_joint(self, idx: int, delta_sign: int):
@@ -228,13 +228,13 @@ class App(ctk.CTk):
         self.backend.step(0.05)
 
     def _hold_start(self, idx: int, delta_sign: int):
-        self.hold_active = True  # ← NEW
+        self.hold_active = True
         self._increment_joint(idx, delta_sign)
         self.hold_params = (idx, delta_sign)
         self.hold_job = self.after(HOLD_MS, self._hold_repeat)
 
     def _hold_repeat(self):
-        if not self.hold_active:  # ← NEW: stop loop
+        if not self.hold_active:  # stop loop
             self.hold_job = None
             return
         idx, delta_sign = self.hold_params
@@ -242,7 +242,7 @@ class App(ctk.CTk):
         self.hold_job = self.after(HOLD_MS, self._hold_repeat)
 
     def _hold_stop(self):
-        self.hold_active = False  # ← NEW
+        self.hold_active = False
         if self.hold_job:
             self.after_cancel(self.hold_job)
             self.hold_job = None
